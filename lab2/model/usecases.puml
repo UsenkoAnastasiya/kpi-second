@@ -1,0 +1,36 @@
+@startuml
+left to right direction
+
+actor User
+actor Reader
+actor Librarian
+actor "Notification Service" as NS <<system>>
+
+User <|-- Reader
+User <|-- Librarian
+
+rectangle "Бібліотека" {
+  usecase "UC-1 Пошук книги" as UC1
+  usecase "UC-2 Видати примірник" as UC2
+  usecase "UC-3 Прийняти повернення" as UC3
+  usecase "UC-4 Перевірити читача" as UC4
+  usecase "UC-5 Перевірити доступність примірника" as UC5
+  usecase "UC-6 Нагадати про строк" as UC6
+  usecase "UC-7 Сповістити про прострочення" as UC7
+  usecase "UC-8 Переглянути свої видачі" as UC8
+  usecase "UC-9 Переглянути прострочені видачі" as UC9
+}
+
+User --> UC1
+Reader --> UC8
+Librarian --> UC2
+Librarian --> UC3
+Librarian --> UC9
+
+UC2 ..> UC4 : <<include>>
+UC2 ..> UC5 : <<include>>
+UC7 ..> UC9 : <<extend>>
+
+UC6 --> NS
+UC7 --> NS
+@enduml
