@@ -15,25 +15,33 @@ sequenceDiagram
     LoanController->>+LoanService: createLoan(readerId, copyId)
 
     LoanService->>+ReaderRepository: findById(readerId)
-    ReaderRepository-->>-LoanService: Reader(reader_id, full_name)
+    ReaderRepository-->>-LoanService: Reader(reader_id, full_name) або null
 
-    LoanService->>+BookCopyRepository: findById(copyId)
-    BookCopyRepository-->>-LoanService: BookCopy(copy_id, status="available")
+    alt reader != null
+        LoanService->>+BookCopyRepository: findById(copyId)
+        BookCopyRepository-->>-LoanService: BookCopy(copy_id, status)
 
-    Note over LoanService: Перевірка: reader != null AND copy.status == "available"
+        alt copy.status == "available"
+            LoanService->>LoanService: loaned_at = currentDate()
+            LoanService->>LoanService: calculateDueDate(loaned_at, DEFAULT_LOAN_DAYS=14)
 
-    LoanService->>LoanService: loaned_at = currentDate() (поточна дата)
-    LoanService->>LoanService: calculateDueDate(loaned_at, DEFAULT_LOAN_DAYS=14)
+            Note over LoanService,LoanRepository: Транзакція: збереження видачі та оновлення статусу примірника
+            LoanService->>+LoanRepository: save(loan)
+            LoanRepository-->>-LoanService: Loan(loan_id, reader_id, copy_id, loaned_at, due_at, returned_at=null)
 
-    Note over LoanService: Транзакція: збереження видачі та оновлення статусу примірника
-    LoanService->>+LoanRepository: save(loan)
-    LoanRepository-->>-LoanService: Loan(loan_id, reader_id, copy_id, loaned_at, due_at, returned_at=null)
+            LoanService->>+BookCopyRepository: updateStatus(copyId, "on_loan")
+            BookCopyRepository-->>-LoanService: BookCopy(copy_id, status="on_loan")
 
-    LoanService->>+BookCopyRepository: updateStatus(copyId, "on_loan")
-    BookCopyRepository-->>-LoanService: BookCopy(copy_id, status="on_loan")
-
-    LoanService-->>LoanController: LoanCreatedResult(loan_id, due_at)
-    LoanController-->>Librarian: LoanCreatedResult(loan_id, due_at)
+            LoanService-->>LoanController: LoanCreatedResult(loan_id, due_at)
+            LoanController-->>Librarian: LoanCreatedResult(loan_id, due_at)
+        else copy.status == "on_loan"
+            LoanService-->>LoanController: CopyUnavailableError("Примірник недоступний")
+            LoanController-->>Librarian: CopyUnavailableError("Примірник недоступний")
+        end
+    else reader == null
+        LoanService-->>LoanController: ReaderNotFoundError("Читача не зареєстровано")
+        LoanController-->>Librarian: ReaderNotFoundError("Читача не зареєстровано")
+    end
 
     deactivate LoanService
     deactivate LoanController
