@@ -17,22 +17,26 @@ sequenceDiagram
     LoanService->>+ReaderRepository: findById(readerId)
     ReaderRepository-->>-LoanService: Reader(reader_id, full_name)
 
-    opt reader != null
-        LoanService->>+BookCopyRepository: findById(copyId)
-        BookCopyRepository-->>-LoanService: BookCopy(copy_id, status="available")
+    LoanService->>+BookCopyRepository: findById(copyId)
+    BookCopyRepository-->>-LoanService: BookCopy(copy_id, status="available")
 
-        opt copy.status == "available"
-            LoanService->>LoanService: calculateDueDate(loaned_at, DEFAULT_LOAN_DAYS=14)
-            LoanService->>+LoanRepository: save(loan)
-            LoanRepository-->>-LoanService: Loan(loan_id, reader_id, copy_id, loaned_at, due_at, returned_at=null)
+    Note over LoanService: Перевірка: reader != null AND copy.status == "available"
 
-            LoanService->>+BookCopyRepository: updateStatus(copyId, "on_loan")
-            BookCopyRepository-->>-LoanService: BookCopy(copy_id, status="on_loan")
-        end
-    end
+    LoanService->>LoanService: loaned_at = currentDate() (поточна дата)
+    LoanService->>LoanService: calculateDueDate(loaned_at, DEFAULT_LOAN_DAYS=14)
 
-    LoanService-->>-LoanController: LoanCreatedResult(loan_id, due_at)
-    LoanController-->>-Librarian: 201 Created (loan_id, due_at)
+    Note over LoanService: Транзакція: збереження видачі та оновлення статусу примірника
+    LoanService->>+LoanRepository: save(loan)
+    LoanRepository-->>-LoanService: Loan(loan_id, reader_id, copy_id, loaned_at, due_at, returned_at=null)
+
+    LoanService->>+BookCopyRepository: updateStatus(copyId, "on_loan")
+    BookCopyRepository-->>-LoanService: BookCopy(copy_id, status="on_loan")
+
+    LoanService-->>LoanController: LoanCreatedResult(loan_id, due_at)
+    LoanController-->>Librarian: LoanCreatedResult(loan_id, due_at)
+
+    deactivate LoanService
+    deactivate LoanController
 ```
 
 ## S-03: Відмова у видачі зайнятого примірника
@@ -56,11 +60,9 @@ sequenceDiagram
 
     alt copy.status == "on_loan"
         LoanService-->>LoanController: CopyUnavailableError("Примірник недоступний")
-        LoanController-->>Librarian: 409 Conflict ("Примірник недоступний")
+        LoanController-->>Librarian: CopyUnavailableError("Примірник недоступний")
     else copy.status == "available"
         Note over LoanService: Продовження оформлення видачі (див. S-02)
-        LoanService-->>LoanController: LoanCreatedResult(loan_id, due_at)
-        LoanController-->>Librarian: 201 Created (loan_id, due_at)
     end
 
     deactivate LoanService
@@ -84,11 +86,9 @@ sequenceDiagram
 
     alt reader == null
         LoanService-->>LoanController: ReaderNotFoundError("Читача не зареєстровано")
-        LoanController-->>Librarian: 404 Not Found ("Читача не зареєстровано")
+        LoanController-->>Librarian: ReaderNotFoundError("Читача не зареєстровано")
     else reader != null
         Note over LoanService: Перевірка примірника та створення видачі (див. S-02)
-        LoanService-->>LoanController: LoanCreatedResult(loan_id, due_at)
-        LoanController-->>Librarian: 201 Created (loan_id, due_at)
     end
 
     deactivate LoanService
