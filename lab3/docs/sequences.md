@@ -33,7 +33,12 @@ sequenceDiagram
 
     LoanService-->>-LoanController: LoanCreatedResult(loan_id, due_at)
     LoanController-->>-Librarian: 201 Created (loan_id, due_at)
-    sequenceDiagram
+```
+
+## S-03: Відмова у видачі зайнятого примірника
+
+```mermaid
+sequenceDiagram
     actor Librarian
     participant LoanController
     participant LoanService
@@ -60,7 +65,12 @@ sequenceDiagram
 
     deactivate LoanService
     deactivate LoanController
-    sequenceDiagram
+```
+
+## S-07: Відмова у видачі незареєстрованому читачеві
+
+```mermaid
+sequenceDiagram
     actor Librarian
     participant LoanController
     participant LoanService
